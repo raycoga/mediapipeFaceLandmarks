@@ -4,7 +4,7 @@ import * as Facemesh from "@mediapipe/face_mesh";
 import * as cam from "@mediapipe/camera_utils";
 import Webcam from "react-webcam";
 import vision from "@mediapipe/tasks-vision";
-import './App.css'
+import "./App.css";
 const { FaceLandmarker, FilesetResolver, DrawingUtils } = vision;
 function App() {
   const webcamRef = useRef(null);
@@ -14,7 +14,15 @@ function App() {
   const videoBlendShapes = document.getElementById("video-blend-shapes");
   const [faceLandmarker, setfaceLandmarker] = useState();
 
-  const onResults = async (results) => {
+  const [SmilePic, setSmilePic] = useState(undefined);
+
+  const onTakePhoto = React.useCallback(() => {
+    const dataUri = webcamRef.current.getScreenshot();
+    sessionStorage.setItem("img-preview", dataUri);
+    setSmilePic(dataUri);
+  }, []);
+
+  const onResults = async (results, SmilePic) => {
     // const video = webcamRef.current.video;
     const videoWidth = webcamRef.current.video.videoWidth;
     const videoHeight = webcamRef.current.video.videoHeight;
@@ -47,7 +55,23 @@ function App() {
         return;
       }
       let htmlMaker = "";
+      let mouthSmileLeft, mouthSmileRight, mouthUpperUpLeft, mouthUpperUpRight;
+
       blendShapes[0].categories.map((shape) => {
+        if (shape.categoryName === "mouthSmileLeft") {
+          mouthSmileLeft = shape.score.toFixed(2);
+        }
+        if (shape.categoryName === "mouthSmileRight") {
+          mouthSmileRight = shape.score.toFixed(2);
+        }
+
+        if (shape.categoryName === "mouthUpperUpLeft") {
+          mouthUpperUpLeft = shape.score.toFixed(2);
+        }
+        if (shape.categoryName === "mouthUpperUpRight") {
+          mouthUpperUpRight = shape.score.toFixed(2);
+        }
+
         htmlMaker += `
             <li class="blend-shapes-item">
               <span class="blend-shapes-label">${
@@ -61,8 +85,21 @@ function App() {
       });
 
       el.innerHTML = htmlMaker;
+
+      const uri = sessionStorage.getItem("img-preview");
+      if (
+        mouthSmileLeft > 0.6 &&
+        mouthSmileRight > 0.6 &&
+        mouthUpperUpLeft > 0.6 &&
+        mouthUpperUpRight > 0.6
+      ) {
+        if (!uri) {
+          console.log("FOTO");
+          onTakePhoto();
+        }
+      }
     }
-    if (results.multiFaceLandmarks) {
+    /*  if (results.multiFaceLandmarks) {
       for (const landmarks of results.multiFaceLandmarks) {
         connect(canvasCtx, landmarks, Facemesh.FACEMESH_TESSELATION, {
           color: "#C0C0C070",
@@ -87,9 +124,10 @@ function App() {
           color: "#E0E0E0",
         });
       }
-    }
+    } */
     canvasCtx.restore();
   };
+
   // }
   async function createFaceLandmarker() {
     let runningMode = "VIDEO";
@@ -126,8 +164,7 @@ function App() {
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-
-      faceMesh.onResults(onResults);
+      faceMesh.onResults((e) => onResults(e, SmilePic));
 
       if (
         typeof webcamRef.current !== "undefined" &&
@@ -144,6 +181,13 @@ function App() {
       }
     }
   }, [faceLandmarker]);
+  /* ESPERANDO POR IMAGEN */
+
+useEffect(() => {
+  const image = sessionStorage.getItem("img-preview");
+  setSmilePic(image)
+}, []);
+
   return (
     <center>
       <div className="App">
@@ -151,7 +195,6 @@ function App() {
           ref={webcamRef}
           style={{
             position: "absolute",
-
             left: 0,
             right: 0,
             textAlign: "center",
@@ -165,7 +208,6 @@ function App() {
           className="output_canvas"
           style={{
             position: "absolute",
-
             left: 0,
             right: 0,
             textAlign: "center",
@@ -176,10 +218,18 @@ function App() {
         ></canvas>
       </div>
 
-
-
-      <div className="blend-shapes">
-        <ul className="blend-shapes-list" id="video-blend-shapes"></ul>
+      <div
+        className="contenedor"
+        style={{ display: "flex", paddingTop: "500px" }}
+      >
+        {SmilePic && (
+          <div id="image-preview-container">
+            <img id="image" src={SmilePic} alt="preview" />
+          </div>
+        )}
+        <div className="blend-shapes">
+          <ul className="blend-shapes-list" id="video-blend-shapes"></ul>
+        </div>
       </div>
     </center>
   );
